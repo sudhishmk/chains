@@ -28,6 +28,8 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/signing/x509"
 	"github.com/tektoncd/chains/pkg/chains/storage"
 	"github.com/tektoncd/chains/pkg/config"
+	"github.com/tektoncd/chains/pkg/pipelinerunmetrics"
+	"github.com/tektoncd/chains/pkg/taskrunmetrics"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"knative.dev/pkg/logging"
@@ -44,6 +46,9 @@ type ObjectSigner struct {
 	Backends          map[string]storage.Backend
 	SecretPath        string
 	Pipelineclientset versioned.Interface
+	// Metrics Recorder config
+	PrMetrics *pipelinerunmetrics.Recorder
+	TrMetrics *taskrunmetrics.Recorder
 }
 
 func allSigners(ctx context.Context, sp string, cfg config.Config) map[string]signing.Signer {
@@ -135,7 +140,7 @@ func (o *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject)
 		// Extract all the "things" to be signed.
 		// We might have a few of each type (several binaries, or images)
 		objects := signableType.ExtractObjects(ctx, tektonObj)
-
+		count := 0
 		// Go through each object one at a time.
 		for _, obj := range objects {
 
@@ -174,6 +179,16 @@ func (o *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject)
 			if err != nil {
 				logger.Error(err)
 				continue
+			} else {
+				logger.Infof("Recording count for signed artifacts for %v %v", obj, count)
+				logger.Infof("Metrics Initialization of pl ", o, o.PrMetrics)
+				if o.PrMetrics != nil {
+					o.PrMetrics.RecordPayloadCountMetrics(ctx, count)
+				}
+				logger.Infof("Metrics Initialization of tl ", o, o.TrMetrics)
+				if o.TrMetrics != nil {
+					o.TrMetrics.RecordPayloadCountMetrics(ctx, count)
+				}
 			}
 
 			// Now store those!
@@ -206,6 +221,15 @@ func (o *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject)
 					logger.Infof("Uploaded entry to %s with index %d", cfg.Transparency.URL, *entry.LogIndex)
 
 					extraAnnotations[ChainsTransparencyAnnotation] = fmt.Sprintf("%s/api/v1/log/entries?logIndex=%d", cfg.Transparency.URL, *entry.LogIndex)
+					logger.Infof("Recording count for signed artifacts for %v %v", obj, count)
+					logger.Infof("Metrics Initialization of pl ", o, o.PrMetrics)
+					if o.PrMetrics != nil {
+						o.PrMetrics.RecordSignedCountMetrics(ctx, count)
+					}
+					logger.Infof("Metrics Initialization of tl ", o, o.TrMetrics)
+					if o.TrMetrics != nil {
+						o.TrMetrics.RecordSignedCountMetrics(ctx, count)
+					}
 				}
 			}
 
@@ -223,7 +247,6 @@ func (o *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject)
 	if err := MarkSigned(ctx, tektonObj, o.Pipelineclientset, extraAnnotations); err != nil {
 		return err
 	}
-
 	return nil
 }
 

@@ -19,6 +19,7 @@ import (
 
 	signing "github.com/tektoncd/chains/pkg/chains"
 	"github.com/tektoncd/chains/pkg/chains/objects"
+	"github.com/tektoncd/chains/pkg/pipelinerunmetrics"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1/pipelinerun"
